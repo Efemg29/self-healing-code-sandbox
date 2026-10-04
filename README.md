@@ -29,10 +29,18 @@ requirements.txt
 ## Quick start
 
 ```bash
+chmod +x scripts/setup.sh
+./scripts/setup.sh
+```
+
+Or manually:
+
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
+pytest
 ```
 
 Without `OPENAI_API_KEY`, the app auto-enables **mock LLM mode** so you can demo the full loop offline.
@@ -49,6 +57,12 @@ Open [http://127.0.0.1:43127](http://127.0.0.1:43127) — interactive UI, docs a
 
 ```bash
 python main.py run "Write a function add(a, b) that returns the sum of two numbers."
+```
+
+### Tests
+
+```bash
+pytest
 ```
 
 ## Docker sandbox (recommended for production)

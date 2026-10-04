@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import re
 
 import instructor
 from openai import OpenAI
@@ -129,7 +128,7 @@ class LLMClient:
                 ),
             )
 
-        if re.search(r"\bpalindrome\b", lowered):
+        if "palindrome" in lowered:
             return CodeGenerationResponse(
                 thinking_process="Normalize case and compare the string to its reverse.",
                 implementation_code=(

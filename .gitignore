@@ -4,7 +4,10 @@ __pycache__/
 *.so
 .Python
 .env
+!.env.example
 .venv/
+__pycache__/
+.pytest_cache/
 venv/
 env/
 *.egg-info/
