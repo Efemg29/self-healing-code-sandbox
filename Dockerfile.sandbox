@@ -1,0 +1,11 @@
+# Minimal sandbox image for executing untrusted pytest suites.
+FROM python:3.11-slim
+
+RUN pip install --no-cache-dir pytest==8.3.5 \
+    && useradd --create-home --uid 65534 nobody || true
+
+WORKDIR /app
+USER nobody
+
+# Default command is overridden by the Docker runner.
+CMD ["pytest", "-q", "--tb=short"]
