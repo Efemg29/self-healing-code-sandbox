@@ -32,7 +32,14 @@ class Settings(BaseModel):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Return cached settings parsed from the process environment."""
-    api_key = os.getenv("OPENAI_API_KEY") or None
+    raw_key = (os.getenv("OPENAI_API_KEY") or "").strip()
+    # Treat empty / placeholder values as missing so demos stay offline-safe.
+    placeholder_markers = ("your-key", "changeme", "replace-me", "xxx")
+    if not raw_key or any(marker in raw_key.lower() for marker in placeholder_markers):
+        api_key = None
+    else:
+        api_key = raw_key
+
     mock_flag = os.getenv("MOCK_LLM", "").lower() in {"1", "true", "yes"}
     # Auto-enable mock LLM when no API key is present so the API remains demoable.
     mock_llm = mock_flag or not api_key

@@ -17,3 +17,10 @@ pip install -r requirements.txt
 if [[ ! -f .env ]]; then
   cp .env.example .env
 fi
+# Keep demo defaults safe even if an older .env.example was copied earlier.
+if grep -qE '^OPENAI_API_KEY=sk-your-key' .env 2>/dev/null; then
+  sed -i 's/^OPENAI_API_KEY=.*/OPENAI_API_KEY=/' .env
+fi
+if grep -qE '^MOCK_LLM=false' .env 2>/dev/null; then
+  sed -i 's/^MOCK_LLM=.*/MOCK_LLM=true/' .env
+fi
