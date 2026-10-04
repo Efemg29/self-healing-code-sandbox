@@ -44,6 +44,22 @@ class DockerRunner:
 
             client = docker.from_env()
             client.ping()
+            # GitHub Actions (and many CI hosts) expose a Docker daemon but do not
+            # ship our custom sandbox image. Prefer local pytest fallback in that case
+            # so mock-mode demos and CI stay green without a prior image build.
+            if not self._image_available(client):
+                if self.settings.allow_local_sandbox:
+                    self._docker_client = None
+                    self._docker_available = False
+                    logger.warning(
+                        "Sandbox image %s not found; using local sandbox fallback.",
+                        self.settings.sandbox_image,
+                    )
+                    return
+                logger.warning(
+                    "Sandbox image %s not found and local fallback disabled.",
+                    self.settings.sandbox_image,
+                )
             self._docker_client = client
             self._docker_available = True
             logger.info("Docker daemon reachable; using container sandbox.")
@@ -55,6 +71,28 @@ class DockerRunner:
                 exc,
                 self.settings.allow_local_sandbox,
             )
+
+    def _image_available(self, client) -> bool:
+        try:
+            client.images.get(self.settings.sandbox_image)
+            return True
+        except Exception:  # noqa: BLE001 - missing image or API flake
+            return False
+
+    @staticmethod
+    def _is_docker_infra_failure(result: SandboxResult) -> bool:
+        """True when Docker never executed the suite (image/daemon/setup error)."""
+        blob = f"{result.stderr}\n{result.stdout}".lower()
+        markers = (
+            "no such image",
+            "unable to find image",
+            "pull access denied",
+            "repository does not exist",
+            "error response from daemon",
+            "cannot connect to the docker",
+            "is the docker daemon running",
+        )
+        return any(marker in blob for marker in markers)
 
     def run(self, workdir: Path) -> SandboxResult:
         """Run pytest against ``solution.py`` / ``test_solution.py`` in ``workdir``."""
@@ -75,7 +113,18 @@ class DockerRunner:
             )
 
         if self._docker_available:
-            return self._run_docker(workdir)
+            result = self._run_docker(workdir)
+            if (
+                not result.success
+                and self.settings.allow_local_sandbox
+                and self._is_docker_infra_failure(result)
+            ):
+                logger.warning(
+                    "Docker sandbox infra failure (%s); falling back to local pytest.",
+                    (result.stderr or result.stdout)[:200],
+                )
+                return self._run_local(workdir)
+            return result
         if self.settings.allow_local_sandbox:
             return self._run_local(workdir)
         return SandboxResult(

@@ -21,4 +21,5 @@ jobs:
         env:
           MOCK_LLM: "true"
           ALLOW_LOCAL_SANDBOX: "true"
+          PYTHONPATH: .
         run: pytest

@@ -67,3 +67,63 @@ def test_docker_required_without_fallback(tmp_path: Path):
     result = runner.run(tmp_path)
     assert result.exit_code == 127
     assert "Docker is required" in result.stderr
+
+
+def test_missing_image_falls_back_to_local(tmp_path: Path, monkeypatch):
+    """CI often has a Docker daemon but not our custom sandbox image."""
+    (tmp_path / "solution.py").write_text(
+        "def add(a, b):\n    return a + b\n", encoding="utf-8"
+    )
+    (tmp_path / "test_solution.py").write_text(
+        "from solution import add\n\ndef test_add():\n    assert add(2, 3) == 5\n",
+        encoding="utf-8",
+    )
+
+    class _FakeImages:
+        def get(self, _name):
+            raise Exception("No such image: self-healing-sandbox:latest")
+
+    class _FakeClient:
+        def ping(self):
+            return True
+
+        @property
+        def images(self):
+            return _FakeImages()
+
+    class _FakeDockerModule:
+        @staticmethod
+        def from_env():
+            return _FakeClient()
+
+    monkeypatch.setitem(__import__("sys").modules, "docker", _FakeDockerModule)
+    runner = DockerRunner(_settings(allow_local_sandbox=True))
+    assert runner._docker_available is False
+    result = runner.run(tmp_path)
+    assert result.success is True
+    assert result.exit_code == 0
+
+
+def test_docker_infra_failure_falls_back_to_local(tmp_path: Path):
+    (tmp_path / "solution.py").write_text(
+        "def add(a, b):\n    return a + b\n", encoding="utf-8"
+    )
+    (tmp_path / "test_solution.py").write_text(
+        "from solution import add\n\ndef test_add():\n    assert add(2, 3) == 5\n",
+        encoding="utf-8",
+    )
+    runner = DockerRunner(_settings(allow_local_sandbox=True))
+    runner._docker_available = True
+
+    def _boom(_workdir):
+        return SandboxResult(
+            success=False,
+            stdout="",
+            stderr="Error: No such image: self-healing-sandbox:latest",
+            exit_code=1,
+        )
+
+    runner._run_docker = _boom  # type: ignore[method-assign]
+    result = runner.run(tmp_path)
+    assert result.success is True
+    assert result.exit_code == 0
